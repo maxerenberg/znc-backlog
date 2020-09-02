@@ -1,6 +1,15 @@
 znc-backlog
 ===========
 
+This is a fork of [znc-backlog](https://github.com/FruitieX/znc-backlog), with the following changes:
+
+* The logs directory path is automatically determined from the log module. The network-loaded directory will
+be searched first, then the user-loaded, then the
+globally loaded (see [here](https://wiki.znc.in/Log#Arguments)).
+* The LogPath command no longer exists. This prevents users from reading arbitrary file paths, e.g. User A reading the logs of User B.
+
+**Note**: This forked module will not work for ZNC versions prior to 1.6 as the log paths are different.
+
 znc-backlog is a ZNC module that makes it easy to request backlog. Its intended
 use is for when you have just launched your IRC client and gotten a few lines of
 backlog sent to you, but want to read more. Instead of having to deal with
@@ -24,20 +33,7 @@ Compiling & Installing
 Usage
 -----
 
-Upon loading the module for the first time, you have to specify a path to your
-log files with the LogPath command. (can also be specified by passing the
-path as an argument when loading the module)
-
-	LogPath /path/to/your/logs/$USER_$NETWORK_$WINDOW_*.log
-
-**$USER** will be replaced with your ZNC username, **$NETWORK** with the current
-network and **$WINDOW** with the requested channel/window name. **$user** and
-**$network** can also be used to force the string to be lowercase. The last found
-asterisk character **'\*'** in the string is assumed to be a date, and the order in
-which the files are read is determined by a simple alphabetical sort. (ie.
-date format order must be year-month-date)
-
-After the module is loaded and LogPath is set, you can request for logs with:
+After the module is loaded, you can request for logs with:
 
 	/msg *backlog <window-name> <num-lines>
 
@@ -57,8 +53,6 @@ to request the default amount (150) of lines from the current window.
 
 TODO
 ----
-- Currently the module can only be loaded on a per-network basis.
-- Autodetect LogPath if possible
 - Optimize?
 - Server-time for timestamp, http://ircv3.org/extensions/server-time-3.2
 - make install rules (see kylef's plugins)

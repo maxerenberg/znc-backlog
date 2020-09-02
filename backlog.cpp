@@ -36,23 +36,10 @@ public:
 };
 
 bool CBacklogMod::OnLoad(const CString& sArgs, CString& sMessage) {
-    CString LogPath = sArgs;
-
-    if(LogPath.empty()) {
-        LogPath = GetNV("LogPath");
-        if(LogPath.empty()) {
-            // TODO: guess logpath?
-            PutModule("LogPath is empty, set it with the LogPath command (help for more info)");
-        }
-    } else {
-        SetNV("LogPath", LogPath);
-        PutModule("LogPath set to: " + LogPath);
-    }
     return true;
 }
 
-CBacklogMod::~CBacklogMod() {
-}
+CBacklogMod::~CBacklogMod() {}
 
 void CBacklogMod::OnModCommand(const CString& sCommand) {
     CString Arg = sCommand.Token(1);
@@ -63,19 +50,7 @@ void CBacklogMod::OnModCommand(const CString& sCommand) {
         PutModule("");
         PutModule("Commands:");
         PutModule("Help (print this text)");
-        PutModule("LogPath <path> (use keywords $USER, $NETWORK, $WINDOW, $user, $network and an asterisk * for date)");
         PutModule("PrintStatusMsgs true/false (print join/part/rename messages)");
-        return;
-    } else if (sCommand.Token(0).Equals("logpath")) {
-        if(Arg.empty()) {
-            PutModule("Usage: LogPath <path> (use keywords $USER, $NETWORK, $WINDOW, $user, $network and an asterisk * for date:)");
-            PutModule("Current LogPath is set to: " + GetNV("LogPath"));
-            return;
-        }
-
-        CString LogPath = sCommand.Token(1, true);
-        SetNV("LogPath", LogPath);
-        PutModule("LogPath set to: " + LogPath);
         return;
     } else if (sCommand.Token(0).Equals("PrintStatusMsgs")) {
         if(Arg.empty() || (!Arg.Equals("true", true) && !Arg.Equals("false", true))) {
@@ -88,10 +63,40 @@ void CBacklogMod::OnModCommand(const CString& sCommand) {
         return;
     }
 
-    // TODO: handle these differently depending on how the module was loaded
-    CString User = (m_pUser ? m_pUser->GetUserName() : "UNKNOWN");
-    CString Network = (m_pNetwork ? m_pNetwork->GetName() : "znc");
+    if (!m_pUser) {
+        PutModule("Error: user could not be determined");
+        return;
+    } else if (!m_pNetwork) {
+        PutModule("Error: network could not be determined");
+        return;
+    }
+    CString User = m_pUser->GetUserName();
+    CString Network = m_pNetwork->GetName();
     CString Channel = sCommand.Token(0);
+
+    // First check if it is network-loaded, then user-loaded, then globally loaded
+    const CModule *logModules[] = {
+        m_pNetwork->GetModules().FindModule("log"),
+        m_pUser->GetModules().FindModule("log"),
+        CZNC::Get().GetModules().FindModule("log")
+    };
+    // TODO: adjust path for older ZNC versions (https://wiki.znc.in/Log)
+    const CString PathSuffixes[] = {
+        "/$WINDOW/*.log",
+        "/$NETWORK/$WINDOW/*.log",
+        "/$USER/$NETWORK/$WINDOW/*.log"
+    };
+    CString Path = "";
+    for (int i = 0; i < 3; i++) {
+        if (logModules[i]) {
+            Path = logModules[i]->GetSavePath() + PathSuffixes[i];
+            break;
+        }
+    }
+    if (Path.Equals("")) {
+        PutModule("Error: log module is not loaded");
+        return;
+    }
 
     int printedLines = 0;
     int reqLines = sCommand.Token(1).ToInt();
@@ -99,13 +104,10 @@ void CBacklogMod::OnModCommand(const CString& sCommand) {
         reqLines = 150;
     }
     reqLines = std::max(std::min(reqLines, 1000), 1);
-
-    CString Path = GetNV("LogPath").substr(); // make copy
+    
     Path.Replace("$NETWORK", Network);
-    Path.Replace("$network", Network.AsLower());
     Path.Replace("$WINDOW", CString(Channel.Replace_n("/", "-").Replace_n("\\", "-")).AsLower());
     Path.Replace("$USER", User);
-    Path.Replace("$user", User.AsLower());
 
     CString DirPath = Path.substr(0, Path.find_last_of("/"));
     CString FilePath;
